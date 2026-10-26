@@ -17,13 +17,12 @@ interface LayoutProps {
 }
 
 const NAV: { id: PageId; label: string; icon: string }[] = [
-  { id: 'dashboard', label: 'Dashboard', icon: '◉' },
+  { id: 'dashboard', label: 'Home', icon: '🏠' },
   { id: 'message-scanner', label: 'Message Scanner', icon: '✉' },
   { id: 'url-analyzer', label: 'URL Analyzer', icon: '🔗' },
-  { id: 'report', label: 'Analysis Report', icon: '📋' },
   { id: 'cybersahayak', label: 'CyberSahayak', icon: '🛡' },
   { id: 'incidents', label: 'Incident Center', icon: '📁' },
-  { id: 'learning', label: 'Cyber Safety', icon: '📚' },
+  { id: 'learning', label: 'Learning', icon: '📚' },
 ];
 
 export function Layout({ current, onNavigate, title, children }: LayoutProps) {
@@ -36,55 +35,85 @@ export function Layout({ current, onNavigate, title, children }: LayoutProps) {
 
   return (
     <div className="app-shell">
-      {mobileOpen && (
-        <div className="sidebar-overlay" onClick={() => setMobileOpen(false)} />
-      )}
-      <aside className={`sidebar ${mobileOpen ? 'open' : ''}`}>
-        <div className="sidebar-brand">
-          <h1>
-            ScamShield <span>360</span>
-          </h1>
-          <p>Detect. Understand. Respond.</p>
-        </div>
-        <nav className="sidebar-nav">
+      <header className="top-nav no-print">
+        <button type="button" className="menu-toggle" onClick={() => setMobileOpen(true)} aria-label="Menu">
+          ☰
+        </button>
+
+        <button type="button" className="nav-brand" onClick={() => go('dashboard')}>
+          <span className="nav-brand-icon">🛡</span>
+          <span className="nav-brand-text">
+            <strong>ScamShield 360</strong>
+            <span>Think Safe. Stay Secure.</span>
+          </span>
+        </button>
+
+        <nav className="nav-links">
           {NAV.map((item) => (
             <button
               key={item.id}
               type="button"
-              className={`nav-item ${current === item.id ? 'active' : ''}`}
+              className={`nav-link ${current === item.id ? 'active' : ''}`}
               onClick={() => go(item.id)}
             >
-              <span aria-hidden style={{ width: 20, textAlign: 'center' }}>
-                {item.icon}
-              </span>
+              <span aria-hidden>{item.icon}</span>
               {item.label}
             </button>
           ))}
         </nav>
-        <div className="sidebar-footer">
-          DU Cyber Satarkata 1.0 demo
-          <br />
-          Local analysis · No API keys required
-        </div>
-      </aside>
 
-      <div className="main">
-        <header className="topbar">
-          <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem' }}>
-            <button
-              type="button"
-              className="menu-toggle"
-              onClick={() => setMobileOpen((v) => !v)}
-              aria-label="Toggle menu"
-            >
-              ☰
-            </button>
-            <h2>{title}</h2>
+        <div className="nav-right">
+          <button type="button" className="nav-icon-btn" aria-label="Search" title="Search">
+            🔍
+          </button>
+          <button type="button" className="nav-icon-btn" aria-label="Settings" title="Demo mode">
+            ⚙
+          </button>
+          <div className="nav-user" title="Demo user">
+            <span className="nav-avatar">J</span>
+            Jatin
           </div>
-          <span className="badge badge-demo">Demo mode</span>
-        </header>
-        <main className="content">{children}</main>
-      </div>
+        </div>
+      </header>
+
+      {mobileOpen && (
+        <div className="mobile-nav open no-print">
+          <div className="mobile-nav-backdrop" onClick={() => setMobileOpen(false)} />
+          <div className="mobile-nav-panel">
+            <button type="button" className="nav-brand" onClick={() => go('dashboard')} style={{ marginBottom: '1rem' }}>
+              <span className="nav-brand-icon">🛡</span>
+              <span className="nav-brand-text">
+                <strong>ScamShield 360</strong>
+                <span>Think Safe. Stay Secure.</span>
+              </span>
+            </button>
+            {NAV.map((item) => (
+              <button
+                key={item.id}
+                type="button"
+                className={`nav-link ${current === item.id ? 'active' : ''}`}
+                onClick={() => go(item.id)}
+              >
+                <span aria-hidden>{item.icon}</span>
+                {item.label}
+              </button>
+            ))}
+          </div>
+        </div>
+      )}
+
+      <main className="main-content">
+        {current !== 'dashboard' && (
+          <div style={{ marginBottom: '1rem' }}>
+            <h2 style={{ margin: 0, fontSize: '1.35rem', fontWeight: 700 }}>{title}</h2>
+          </div>
+        )}
+        {children}
+      </main>
+
+      <footer className="app-footer no-print">
+        Together for a Safer Digital India · DU Cyber Satarkata 1.0 demo · Local analysis · No API keys required
+      </footer>
     </div>
   );
 }
