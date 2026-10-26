@@ -1,0 +1,3 @@
+/* Minimal reset — design system lives in styles/global.css */
+* { box-sizing: border-box; }
+body { margin: 0; }
