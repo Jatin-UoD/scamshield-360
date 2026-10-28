@@ -1,34 +1,91 @@
 /**
- * Optional AI provider interface.
- * Current build uses local rule-based analysis only.
- * When a real backend + API key is configured, implement this interface
- * and route through a server-side endpoint (never put API keys in the browser).
+ * Optional AI explanation client.
+ * Calls a local/backend API only — never puts NVIDIA_API_KEY in the browser.
+ * If VITE_AI_API_URL is unset or the server has no key, local analysis still works.
  */
 
-import type { AnalysisResult } from '../types';
-import { analyseMessage } from './messageAnalyzer';
-
-export interface AiProvider {
-  isConfigured(): boolean;
-  analyseMessageWithAi?(text: string): Promise<AnalysisResult>;
-  statusMessage(): string;
+export interface AiExplainRequest {
+  message: string;
+  localScore?: number;
+  riskLevel?: string;
+  indicators?: string[];
 }
 
-/** Default local fallback — always available */
-export const localAiFallback: AiProvider = {
-  isConfigured: () => false,
-  statusMessage: () =>
-    'AI provider not configured. Using local rule-based analysis only.',
-  analyseMessageWithAi: async (text: string) => analyseMessage(text),
-};
+export interface AiExplainResponse {
+  usedAI: boolean;
+  explanation: string | null;
+  model: string | null;
+  error: string | null;
+}
+
+/** Backend base URL, e.g. http://127.0.0.1:8000 — no secrets here */
+function getAiApiBase(): string {
+  const base = import.meta.env.VITE_AI_API_URL as string | undefined;
+  return (base || '').replace(/\/$/, '');
+}
+
+export function isAiBackendConfigured(): boolean {
+  return Boolean(getAiApiBase());
+}
+
+export function aiStatusMessage(): string {
+  if (!getAiApiBase()) {
+    return 'Optional AI backend not configured. Local rule-based analysis only.';
+  }
+  return 'Optional AI backend URL is set. Explanations load when the server has a valid API key.';
+}
 
 /**
- * Future integration point.
- * Example (server-side only):
- *   const res = await fetch('/api/ai/analyse-message', { method: 'POST', body: JSON.stringify({ text }) });
- * API keys must live in server environment variables, never in frontend code.
+ * Request a natural-language explanation for a message already scored locally.
+ * Safe to call always: returns usedAI=false on any failure.
  */
-export function getAiProvider(): AiProvider {
-  // In future: check import.meta.env.VITE_AI_ENABLED and call backend
-  return localAiFallback;
+export async function explainWithAi(
+  req: AiExplainRequest
+): Promise<AiExplainResponse> {
+  const base = getAiApiBase();
+  if (!base) {
+    return {
+      usedAI: false,
+      explanation: null,
+      model: null,
+      error: 'AI backend URL not set (VITE_AI_API_URL).',
+    };
+  }
+
+  try {
+    const res = await fetch(`${base}/api/ai/explain`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', Accept: 'application/json' },
+      body: JSON.stringify({
+        message: req.message,
+        localScore: req.localScore,
+        riskLevel: req.riskLevel,
+        indicators: req.indicators ?? [],
+      }),
+    });
+
+    if (!res.ok) {
+      return {
+        usedAI: false,
+        explanation: null,
+        model: null,
+        error: `AI backend HTTP ${res.status}`,
+      };
+    }
+
+    const data = (await res.json()) as AiExplainResponse;
+    return {
+      usedAI: Boolean(data.usedAI),
+      explanation: data.explanation ?? null,
+      model: data.model ?? null,
+      error: data.error ?? null,
+    };
+  } catch {
+    return {
+      usedAI: false,
+      explanation: null,
+      model: null,
+      error: 'Could not reach AI backend.',
+    };
+  }
 }
