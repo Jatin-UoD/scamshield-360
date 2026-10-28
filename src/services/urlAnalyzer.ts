@@ -11,8 +11,8 @@ function generateId(): string {
 }
 
 function scoreToLevel(score: number): RiskLevel {
-  if (score >= 55) return 'High';
-  if (score >= 28) return 'Medium';
+  if (score >= 50) return 'High';
+  if (score >= 22) return 'Medium';
   return 'Low';
 }
 
@@ -25,31 +25,47 @@ function isValidUrlSyntax(raw: string): boolean {
   }
 }
 
-function extractHostname(raw: string): string {
+function parseUrl(raw: string): { hostname: string; pathname: string; protocol: string; href: string } {
   try {
     const u = new URL(raw.startsWith('http') ? raw : `https://${raw}`);
-    return u.hostname.toLowerCase();
+    return {
+      hostname: u.hostname.toLowerCase(),
+      pathname: (u.pathname + u.search).toLowerCase(),
+      protocol: u.protocol,
+      href: u.href.toLowerCase(),
+    };
   } catch {
-    return '';
+    return { hostname: '', pathname: '', protocol: '', href: raw.toLowerCase() };
   }
 }
 
 const LOOKALIKE_PATTERNS: { brand: string; pattern: RegExp; weight: number }[] = [
-  { brand: 'paypal', pattern: /paypa[l1]|pay-pal|paypa1/i, weight: 22 },
-  { brand: 'google', pattern: /g[o0]{2}gle|gooogle|g00gle/i, weight: 20 },
-  { brand: 'microsoft', pattern: /micr[o0]soft|mircosoft|micros0ft/i, weight: 20 },
-  { brand: 'amazon', pattern: /amaz[o0]n|arnazon|amaz0n/i, weight: 20 },
-  { brand: 'apple', pattern: /app1e|appie/i, weight: 18 },
-  { brand: 'facebook', pattern: /faceb[o0]{2}k|facebok/i, weight: 18 },
-  { brand: 'instagram', pattern: /instagr[a@]m/i, weight: 16 },
-  { brand: 'whatsapp', pattern: /whattsapp|whatsap/i, weight: 16 },
-  { brand: 'sbi / bank', pattern: /sbi[-.]?(bank|online|secure)|statebank/i, weight: 18 },
-  { brand: 'hdfc', pattern: /hdfc[-.]?(bank|secure|login)/i, weight: 18 },
+  { brand: 'paypal', pattern: /paypa[l1]|pay-pal|paypa1/i, weight: 24 },
+  { brand: 'google', pattern: /g[o0]{2}gle|gooogle|g00gle/i, weight: 22 },
+  { brand: 'microsoft', pattern: /micr[o0]soft|mircosoft|micros0ft/i, weight: 22 },
+  { brand: 'amazon', pattern: /amaz[o0]n|arnazon|amaz0n/i, weight: 22 },
+  { brand: 'apple', pattern: /app1e|appie/i, weight: 20 },
+  { brand: 'facebook', pattern: /faceb[o0]{2}k|facebok/i, weight: 20 },
+  { brand: 'instagram', pattern: /instagr[a@]m/i, weight: 18 },
+  { brand: 'whatsapp', pattern: /whattsapp|whatsap/i, weight: 18 },
+  { brand: 'sbi', pattern: /sbi[-.]?(bank|online|secure|kyc)|state[-]?bank/i, weight: 24 },
+  { brand: 'hdfc', pattern: /hdfc[-.]?(bank|secure|login|kyc)/i, weight: 24 },
+  { brand: 'icici', pattern: /icici[-.]?(bank|secure|login)/i, weight: 22 },
+  { brand: 'axis', pattern: /axis[-.]?(bank|secure|login)/i, weight: 20 },
+  { brand: 'paytm', pattern: /paytm[-.]?(secure|login|verify)/i, weight: 20 },
+  { brand: 'phonepe', pattern: /phonepe[-.]?(secure|login)/i, weight: 20 },
 ];
 
 const SHORTENER_HOSTS = [
   'bit.ly', 'tinyurl.com', 't.co', 'goo.gl', 'rebrand.ly', 'cutt.ly',
-  'rb.gy', 'ow.ly', 'is.gd', 'buff.ly', 'adf.ly', 'j.mp',
+  'rb.gy', 'ow.ly', 'is.gd', 'buff.ly', 'adf.ly', 'j.mp', 'bl.ink',
+];
+
+const OFFICIAL_BRAND_HOSTS = [
+  'sbi.co.in', 'onlinesbi.sbi', 'hdfcbank.com', 'icicibank.com', 'axisbank.com',
+  'paypal.com', 'google.com', 'microsoft.com', 'amazon.in', 'amazon.com',
+  'apple.com', 'facebook.com', 'instagram.com', 'whatsapp.com', 'paytm.com',
+  'phonepe.com', 'rbi.org.in', 'uidai.gov.in', 'income-tax.gov.in',
 ];
 
 export function analyseUrl(rawInput: string): AnalysisResult {
@@ -72,29 +88,29 @@ export function analyseUrl(rawInput: string): AnalysisResult {
     score += 30;
   }
 
-  const hostname = extractHostname(input);
-  const fullLower = input.toLowerCase();
+  const { hostname, pathname, protocol, href } = parseUrl(input);
+  const fullLower = href || input.toLowerCase();
 
   if (/^(\d{1,3}\.){3}\d{1,3}$/.test(hostname) || hostname.startsWith('[')) {
     indicators.push({
       id: 'ip_host',
       label: 'IP-address used as host',
       description: 'Legitimate sites rarely use raw IP addresses in the browser bar. This is a common phishing tactic.',
-      weight: 28,
+      weight: 30,
       category: 'Structure',
     });
-    score += 28;
+    score += 30;
   }
 
   if (SHORTENER_HOSTS.some((s) => hostname === s || hostname.endsWith(`.${s}`))) {
     indicators.push({
       id: 'shortener',
       label: 'URL shortener detected',
-      description: 'Shortened links hide the real destination. Resolve them carefully with a safe expander if needed.',
-      weight: 18,
+      description: 'Shortened links hide the real destination. Treat them as higher risk until expanded safely.',
+      weight: 22,
       category: 'Obfuscation',
     });
-    score += 18;
+    score += 22;
   }
 
   if (/[^\x00-\x7F]/.test(hostname) || hostname.includes('xn--')) {
@@ -102,10 +118,10 @@ export function analyseUrl(rawInput: string): AnalysisResult {
       id: 'non_ascii',
       label: 'Non-ASCII or punycode hostname',
       description: 'Internationalised domain names can be used for lookalike attacks (homograph phishing).',
-      weight: 22,
+      weight: 24,
       category: 'Obfuscation',
     });
-    score += 22;
+    score += 24;
   }
 
   const labels = hostname.split('.').filter(Boolean);
@@ -113,11 +129,11 @@ export function analyseUrl(rawInput: string): AnalysisResult {
     indicators.push({
       id: 'deep_subdomain',
       label: 'Unusually deep subdomain structure',
-      description: 'Many nested subdomains can be used to make a malicious domain look longer and more official.',
-      weight: 14,
+      description: 'Many nested subdomains can make a malicious domain look longer and more official.',
+      weight: 16,
       category: 'Structure',
     });
-    score += 14;
+    score += 16;
   }
 
   if (input.includes('@') && input.indexOf('@') < input.lastIndexOf('.')) {
@@ -125,24 +141,23 @@ export function analyseUrl(rawInput: string): AnalysisResult {
       id: 'at_trick',
       label: 'Possible credential or redirect trick (@)',
       description: 'The @ character in URLs can hide the real host that the browser will connect to.',
-      weight: 25,
+      weight: 28,
       category: 'Obfuscation',
     });
-    score += 25;
+    score += 28;
   }
 
   for (const item of LOOKALIKE_PATTERNS) {
     if (item.pattern.test(hostname) || item.pattern.test(fullLower)) {
-      const isLikelyReal =
-        hostname === `${item.brand}.com` ||
-        hostname === `${item.brand}.in` ||
-        hostname.endsWith(`.${item.brand}.com`) ||
-        hostname.endsWith(`.${item.brand}.in`);
-      if (!isLikelyReal) {
+      const isOfficial = OFFICIAL_BRAND_HOSTS.some(
+        (h) => hostname === h || hostname.endsWith(`.${h}`)
+      );
+      if (!isOfficial) {
         indicators.push({
           id: `lookalike_${item.brand}`,
-          label: `Possible lookalike of "${item.brand}"`,
-          description: `Hostname or path resembles a known brand. This is a structural warning only - not a definitive match.`,
+          label: `Possible lookalike / brand misuse ("${item.brand}")`,
+          description:
+            'Hostname or path resembles a known brand but is not on a recognised official domain. Structural warning only.',
           weight: item.weight,
           category: 'Lookalike',
         });
@@ -153,16 +168,53 @@ export function analyseUrl(rawInput: string): AnalysisResult {
   }
 
   const tld = labels[labels.length - 1] || '';
-  const suspiciousTlds = ['tk', 'ml', 'ga', 'cf', 'gq', 'xyz', 'top', 'club', 'work', 'click'];
+  const suspiciousTlds = [
+    'tk', 'ml', 'ga', 'cf', 'gq', 'xyz', 'top', 'club', 'work', 'click',
+    'loan', 'win', 'online', 'site', 'icu', 'rest', 'cfd',
+  ];
   if (suspiciousTlds.includes(tld)) {
     indicators.push({
       id: 'suspicious_tld',
       label: `Uncommon / frequently-abused TLD (.${tld})`,
       description: 'Some TLDs appear more often in phishing campaigns. This alone does not prove malice.',
-      weight: 12,
+      weight: 18,
       category: 'Structure',
     });
-    score += 12;
+    score += 18;
+  }
+
+  const phishingPath =
+    /(kyc|verify|login|signin|secure|account[-_]?update|password[-_]?reset|claim[-_]?reward|confirm[-_]?identity|unlock[-_]?account|suspended|blocked)/i;
+  if (phishingPath.test(pathname) || phishingPath.test(hostname)) {
+    indicators.push({
+      id: 'phishing_keywords',
+      label: 'Phishing-style keywords in path or host',
+      description:
+        'Words like KYC, login, verify, secure, claim often appear in fake banking / account pages.',
+      weight: 20,
+      category: 'Phishing Pattern',
+    });
+    score += 20;
+  }
+
+  if (protocol === 'http:' && phishingPath.test(fullLower)) {
+    indicators.push({
+      id: 'http_sensitive',
+      label: 'Non-HTTPS link with sensitive-looking path',
+      description: 'Sensitive actions over plain HTTP are a strong red flag.',
+      weight: 16,
+      category: 'Structure',
+    });
+    score += 16;
+  } else if (protocol === 'http:' && hostname && !hostname.includes('localhost')) {
+    indicators.push({
+      id: 'insecure_http',
+      label: 'Uses plain HTTP (not HTTPS)',
+      description: 'Modern trusted sites use HTTPS. Plain HTTP is easier to intercept or spoof.',
+      weight: 10,
+      category: 'Structure',
+    });
+    score += 10;
   }
 
   if (/^(javascript|data):/i.test(input)) {
@@ -176,6 +228,20 @@ export function analyseUrl(rawInput: string): AnalysisResult {
     score += 40;
   }
 
+  if ((hostname.match(/-/g) || []).length >= 3) {
+    indicators.push({
+      id: 'hyphen_host',
+      label: 'Hyphen-heavy hostname',
+      description: 'Long hyphenated hostnames are often used to imitate brands (e.g. secure-sbi-kyc-update).',
+      weight: 14,
+      category: 'Structure',
+    });
+    score += 14;
+  }
+
+  if (indicators.length >= 3) score += 10;
+  if (indicators.length >= 4) score += 8;
+
   const riskScore = Math.min(100, score);
   const riskLevel = scoreToLevel(riskScore);
 
@@ -185,7 +251,7 @@ export function analyseUrl(rawInput: string): AnalysisResult {
       : riskLevel === 'Medium'
         ? 'Some suspicious structural patterns were detected. Verify the domain carefully before visiting.'
         : indicators.length === 0
-          ? 'No strong structural indicators found. This does NOT mean the URL is safe - local checks cannot confirm reputation.'
+          ? 'No strong structural indicators found. This does NOT mean the URL is safe — local checks cannot confirm reputation.'
           : 'Only mild structural observations were made. Still treat unknown links with caution.';
 
   const explanations = indicators.map(
