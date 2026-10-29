@@ -15,17 +15,16 @@ ScamShield 360 combines local rule-based scam message & URL analysis (**ScamShie
 - **CyberSahayak** — curated guidance for 6 common fraud situations + Indian helplines (1930, cybercrime.gov.in)
 - **Incident Center** — localStorage-backed incident records & checklist
 - **Cyber Safety Learning** — tips + interactive quiz
-- **Optional AI explanation** — NVIDIA NIM via a small FastAPI server (not required)
 
 ## Important limitations (demo)
 
-- Detection is **local rule-based** (keywords / patterns). It is **not** advanced AI by default.
+- Detection is **local rule-based** (keywords / patterns). It is **not** advanced AI.
 - No live threat-intelligence database is consulted.
 - Absence of indicators does **not** prove safety.
 - localStorage is browser/device-specific — not secure cloud storage.
 - Never paste real OTPs, passwords or full card numbers.
 
-## Run locally (no API key needed)
+## Run locally
 
 ```bash
 cd scamshield-360
@@ -49,50 +48,17 @@ npm run preview
 3. Framework preset: **Vite**.
 4. Build command: `npm run build`
 5. Output directory: `dist`
-6. Deploy. No environment variables required for the API-free build.
+6. Deploy. **No API keys or environment variables required.**
 
-## Optional AI explanations (NVIDIA)
+## Future (optional)
 
-Local detection **always works** without any API key.
-
-1. Get a key from [build.nvidia.com](https://build.nvidia.com) — **never commit the key**.
-2. Backend:
-
-```bash
-cd api
-python -m venv .venv
-source .venv/bin/activate   # Windows: .venv\Scripts\activate
-pip install -r requirements.txt
-cp .env.example .env
-# Edit .env → set NVIDIA_API_KEY=...
-uvicorn main:app --reload --port 8000
-```
-
-3. Frontend (project root):
-
-```bash
-cp .env.example .env
-# Set only: VITE_AI_API_URL=http://127.0.0.1:8000
-npm run dev
-```
-
-**Security**
-
-- Real keys live only in `api/.env` (gitignored).
-- Frontend may store **backend URL** only (`VITE_AI_API_URL`) — never `NVIDIA_API_KEY`.
-- Do **not** put the NVIDIA key in Vercel as `VITE_*` (that exposes it in the browser bundle).
-- If the key or server is missing, Message Scanner still shows local scores.
-
-Default model id in `api/.env.example`: `nvidia/nemotron-3-nano-30b-a3b` (confirm exact id on build.nvidia.com).
-
-## Future: threat intelligence
-
-Wire `src/services/threatIntelProvider.ts` to a server-side URL reputation API (e.g. Google Safe Browsing). Keep those keys server-side too.
+- Server-side AI or URL threat-intel can be added later via provider stubs in `src/services/`.
+- Keep any API keys on the **server only**, never in the frontend.
 
 ## Stack
 
-- React 18 + TypeScript + Vite (frontend)
-- Optional: FastAPI + NVIDIA Integrate API (explanations only)
+- React 18 + TypeScript + Vite
+- No required external APIs for the demo
 
 ## License
 

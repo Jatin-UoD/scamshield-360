@@ -1,6 +1,5 @@
 import { useState } from 'react';
 import { analyseMessage, DEMO_MESSAGES } from '../services/messageAnalyzer';
-import { explainWithAi, isAiBackendConfigured, type AiExplainResponse } from '../services/aiProvider';
 import { saveAnalysisResult } from '../services/storageService';
 import type { AnalysisResult } from '../types';
 import type { PageId } from '../components/Layout';
@@ -13,8 +12,6 @@ interface Props {
 export function MessageScanner({ onNavigate, onResult }: Props) {
   const [text, setText] = useState('');
   const [result, setResult] = useState<AnalysisResult | null>(null);
-  const [aiExplain, setAiExplain] = useState<AiExplainResponse | null>(null);
-  const [aiLoading, setAiLoading] = useState(false);
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(false);
 
@@ -31,25 +28,12 @@ export function MessageScanner({ onNavigate, onResult }: Props) {
       saveAnalysisResult(res);
       onResult(res);
       setLoading(false);
-      setAiExplain(null);
-      if (isAiBackendConfigured()) {
-        setAiLoading(true);
-        explainWithAi({
-          message: text,
-          localScore: res.riskScore,
-          riskLevel: res.riskLevel,
-          indicators: res.indicators.map((i) => i.id),
-        })
-          .then(setAiExplain)
-          .finally(() => setAiLoading(false));
-      }
     }, 280);
   };
 
   const loadDemo = (key: keyof typeof DEMO_MESSAGES) => {
     setText(DEMO_MESSAGES[key]);
     setResult(null);
-    setAiExplain(null);
     setError('');
   };
 
@@ -151,34 +135,6 @@ export function MessageScanner({ onNavigate, onResult }: Props) {
               </li>
             ))}
           </ol>
-
-          {(aiLoading || aiExplain?.usedAI || aiExplain?.error) && (
-            <div style={{ marginTop: '1.25rem', paddingTop: '1rem', borderTop: '1px solid var(--border-soft)' }}>
-              <h4 style={{ fontSize: '0.9rem', margin: '0 0 0.5rem' }}>
-                AI explanation {aiExplain?.usedAI ? '(optional)' : ''}
-              </h4>
-              {aiLoading && (
-                <p style={{ color: 'var(--text-muted)', fontSize: '0.9rem' }}>Generating explanation…</p>
-              )}
-              {!aiLoading && aiExplain?.usedAI && aiExplain.explanation && (
-                <>
-                  <p style={{ margin: 0, fontSize: '0.9rem', lineHeight: 1.55, whiteSpace: 'pre-wrap' }}>
-                    {aiExplain.explanation}
-                  </p>
-                  {aiExplain.model && (
-                    <p className="form-hint" style={{ marginTop: '0.75rem' }}>
-                      Model: {aiExplain.model}. This is an LLM opinion, not a legal or forensic verdict.
-                    </p>
-                  )}
-                </>
-              )}
-              {!aiLoading && !aiExplain?.usedAI && aiExplain?.error && (
-                <p style={{ color: 'var(--text-dim)', fontSize: '0.85rem', margin: 0 }}>
-                  AI explanation unavailable ({aiExplain.error}). Local analysis above still applies.
-                </p>
-              )}
-            </div>
-          )}
 
           <div className="disclaimer">{result.disclaimer}</div>
 
